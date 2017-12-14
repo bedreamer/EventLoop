@@ -21,19 +21,39 @@ EventLoop是一个使用select方法进行超时和套接字I/O的异步事件�
     import socket
     from SelectLoop import *
 
-    def delay_callback(t):
-        print('callback', t)
+
+    def run_after_1_second(t):
+        print('run_after_1_second', t)
+
+
+    def run_after_3_second(cancel_key):
+        loop = get_select_loop()
+        loop.cancel_delay(cancel_key)
+        print(cancel_key, 'been cancelled!')
+
+
+    def run_after_5_second(t):
+        # this function will be never reached
+        print('run_after_5_second', t)
+
+
+    def run_after_7_second(t):
+        print('run_after_7_second', t)
+
 
     loop = get_select_loop()
-    server = SelectSocketServer('127.0.0.1', 19999)
-    server.start_service()
-    cancel = list()
-    for i in xrange(10):
-        name = loop.schedule_delay(i, delay_callback, i)
-        if i % 2 == 0:
-            cancel.append(name)
+    schedule_delay_list = list()
 
-    for name in cancel:
-        loop.cancel_delay(name)
+    key = loop.schedule_delay(1, run_after_1_second, 1)
+    schedule_delay_list.append(key)
+
+    cancel_key = loop.schedule_delay(5, run_after_5_second, 3)
+    schedule_delay_list.append(cancel_key)
+
+    key = loop.schedule_delay(3, run_after_3_second, cancel_key)
+    schedule_delay_list.append(key)
+
+    key = loop.schedule_delay(7, run_after_7_second, 4)
+    schedule_delay_list.append(key)
 
     loop.run_forever()
