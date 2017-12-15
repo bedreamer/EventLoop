@@ -149,12 +149,24 @@ class SelectSocketClient:
 
 
 if __name__ == '__main__':
+    import threading
+
+    def thread_callback(t):
+        print("thread", t)
+
+
+    def thread_main():
+        loop = get_select_loop()
+        name = loop.schedule_delay(10, thread_callback, 10)
+        loop.run_forever()
+
+
     def delay_callback(t):
         print('callback', t)
 
     loop = get_select_loop()
-    server = SelectSocketServer('127.0.0.1', 19999)
-    server.start_service()
+    #server = SelectSocketServer('127.0.0.1', 19999)
+    #server.start_service()
     cancel = list()
     for i in xrange(10):
         name = loop.schedule_delay(i, delay_callback, i)
@@ -163,5 +175,8 @@ if __name__ == '__main__':
 
     for name in cancel:
         loop.cancel_delay(name)
+
+
+    threading._start_new_thread(thread_main, ())
 
     loop.run_forever()

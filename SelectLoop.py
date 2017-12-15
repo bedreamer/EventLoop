@@ -1,6 +1,7 @@
 # -*- coding: utf8 -*-
 import select
 import time
+import threading
 
 
 class DelayProbe:
@@ -118,8 +119,12 @@ class SelectLoop:
                 delayer.do_callback()
 
 
-_loop = SelectLoop()
-
-
 def get_select_loop():
+    """针对每一个线程开辟新的循环对象"""
+    thread = threading.current_thread()
+    try:
+        return thread._loop
+    except:
+        _loop = SelectLoop()
+        thread._loop = _loop
     return _loop
