@@ -17,18 +17,17 @@ def format_delta(delta):
     hour = int((delta - day * 24) / 3600)
     mini = int((delta - day * 24 - hour * 3600) / 60)
     seconds = int(delta - day * 24 - hour * 3600 - mini * 60)
-    day_s = "%d天" % day if day > 0 else None
-    hour_s = "%d时" % hour if hour > 0 else None
-    mini_s = "%d分" % mini if mini > 0 else None
-    seconds_s = "%d秒" % seconds if seconds > 0 else None
+    day_s = u"%d天" % day if day > 0 else None
+    hour_s = u"%d时" % hour if hour > 0 else None
+    mini_s = u"%d分" % mini if mini > 0 else None
+    seconds_s = u"%d秒" % seconds if seconds > 0 else None
 
     s = [day_s, hour_s, mini_s, seconds_s]
     while None in s:
         s.remove(None)
     if len(s) == 0:
-        return "0秒"
-    return "".join(s)
-
+        return u"0秒"
+    return u"".join(s)
 
 
 support_version = [0x04, 0x05]
@@ -44,32 +43,48 @@ class Socket5Peer:
         self.remote_address = None # (ip, port)
         self.version = None
 
+        self.local_protocol = self.confirm_method
+        self.local_buff = list()
+
+    def confirm_method(self, fds):
+        """版本确认"""
+        return self.confirm_method
+
     def start(self):
         log("new connection from ip:", self.local_address[0], "port:", self.local_address[1])
         loop = get_select_loop()
-        loop.schedule_delay(70, self.close_after_10_seconds)
+        loop.schedule_read(self.local_fds, self.local_readable)
 
     def stop(self):
+        loop = get_select_loop()
         if self.local_fds is not None:
+            loop.cancel_read(self.local_fds)
+            loop.cancel_write(self.local_fds)
             self.local_fds.close()
+            self.local_fds = None
+
         if self.remote_fds is not None:
+            loop.cancel_read(self.remote_fds)
+            loop.cancel_write(self.remote_fds)
             self.remote_fds.close()
-        delta = time.time()-self.born
+            self.remote_fds = None
+
+        delta = time.time() - self.born
         log("peer closed ip:", self.local_address[0], "port:", self.local_address[1], "run:", format_delta(delta))
 
-    def close_after_10_seconds(self):
-        self.stop()
-
-    def client_readable(self, fds):
+    def local_readable(self, fds):
         """客户端可读"""
-        pass
+        try:
+            data = fds.recv(2048)
+            if data in {None, ''}:
+                raise ValueError('connection closed!')
+            self.local_buff.append(data)
+            self.local_protocol(fds)
+        except:
+            self.stop()
 
-    def client_writable(self, fds):
-        """客户端可写"""
-        pass
-
-    def remote_connect_readable(self, fds):
-        """连接远端可读"""
+    def remote_connect_failed(self, fds):
+        """连接远端失败"""
         pass
 
     def remote_connect_writable(self, fds):
@@ -78,10 +93,6 @@ class Socket5Peer:
 
     def remote_readable(self, fds):
         """远端可读"""
-        pass
-
-    def remote_writable(self, fds):
-        """远端可写"""
         pass
 
 
