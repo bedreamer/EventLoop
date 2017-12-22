@@ -23,13 +23,12 @@ class ClientBasicProtocol(object):
     pass
 
 
-class SelectSocketServer:
-    def __init__(self, iface=None, port=None, connection_protocal=None):
+class SelectSocketServer(object):
+    def __init__(self, iface=None, port=None):
         self.iface = iface
         self.port = port
         self.fds = None
         self.started = False
-        self.protocol = connection_protocal
         if None not in {iface, port}:
             self.start_service()
 
@@ -54,7 +53,7 @@ class SelectSocketServer:
         self.fds.bind((self.iface, self.port))
         self.fds.listen(128)
         loop = get_select_loop()
-        loop.schedule_read(self.fds, self._accept)
+        loop.schedule_read(self.fds, self.accept)
         self.started = True
 
     def stop_service(self):
@@ -64,15 +63,8 @@ class SelectSocketServer:
         self.fds.close()
         self.fds = None
 
-    def _accept(self, fds):
-        if fds != self.fds:
-            raise ValueError("invalid fds value")
-        peer, address = self.fds.accept()
-        self._new_connection(peer, address)
-
-    def _new_connection(self, peer, address):
-        print("new connection @", peer.fileno(),address)
-        connection = self.protocol(peer, address)
+    def accept(self, fds):
+        raise TypeError("you should override this function.")
 
 
 class SelectSocketClient:

@@ -41,7 +41,10 @@ class Socket5Peer:
 
         self.remote_fds = None
         self.remote_address = None # (ip, port)
+
         self.version = None
+        self.method_count = None
+        self.method_list = None
 
         self.local_protocol = self.confirm_method
         self.local_buff = list()
@@ -79,7 +82,7 @@ class Socket5Peer:
             if data in {None, ''}:
                 raise ValueError('connection closed!')
             self.local_buff.append(data)
-            self.local_protocol(fds)
+            self.local_protocol = self.local_protocol(fds)
         except:
             self.stop()
 
@@ -103,6 +106,7 @@ class Socket5ProxyServer:
         self.fds = None
 
     def start(self):
+        """"""
         log("proxy starting on interface:", self.iface, "port:", self.port)
         self.fds = socket.socket()
         self.fds.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
@@ -122,3 +126,7 @@ if __name__ == '__main__':
     proxy = Socket5ProxyServer('0.0.0.0', 9998)
     proxy.start()
     loop.run_forever()
+
+    l = 's' \
+        's'
+    l.replace()

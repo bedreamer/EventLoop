@@ -87,8 +87,8 @@ class SelectLoop:
     def run_forever(self, ttw=None):
         ttw = 600 if ttw is None else ttw
         while len(self.read_probe) + len(self.write_probe) + len(self.delay_probe) > 0:
-            r = [fds for fds in self.read_probe.iterkeys()]
-            w = [fds for fds in self.write_probe.iterkeys()]
+            r = [fds for fds, _ in self.read_probe.items()]
+            w = [fds for fds, _ in self.write_probe.items()]
 
             almost_die_delta = 600
             while len(self.delay_probe) > 0:
@@ -103,7 +103,10 @@ class SelectLoop:
             # for io logical
             if len(r) + len(w) > 0:
                 ttw = min((almost_die_delta, 600))
-                readable, writable, _ = select.select(r, w, [], ttw)
+                try:
+                    readable, writable, _ = select.select(r, w, [], ttw)
+                except Exception as e:
+                    print(e)
                 for fds in readable: self.read_probe[fds](fds)
                 for fds in writable: self.write_probe[fds](fds)
             else:
