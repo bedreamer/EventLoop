@@ -77,6 +77,15 @@ class HttpRespons(object):
         self.iterable_body = None
         self.set_response(body)
 
+    def next(self):
+        """用于进行数据迭代输出"""
+        return self.iterable_body.next()
+
+    @property
+    def do_response(self):
+        """返回应答生成器"""
+        return self.iterable_body
+
     def response_wrapper(self, list_body):
         """convert all data type into generator"""
         yield self.make_respons_header()
@@ -84,6 +93,7 @@ class HttpRespons(object):
             yield context
 
     def make_respons_header(self):
+        """将全部头部连同EOH一起返回"""
         ex_headers = ["%s: %s\r\n" % (key, value) for key, value in self.headers.items()]
         headers = ["%s %d %s\r\n" % ('HTTP/1.1', self.code, self.status)]
         headers.extend(ex_headers)
@@ -95,8 +105,8 @@ class HttpRespons(object):
         self.headers[key] = value
 
     def set_response(self, body):
+        """为应答体设置一个新的返回数据体"""
         if body is None:
-            self.set_header('Content-Length', '0')
             self.iterable_body = self.response_wrapper(list())
 
         elif isinstance(body, str):
@@ -137,7 +147,8 @@ class HttpResponsFile(HttpRespons):
 
         # 文件最后修改日期
         last_modify_tsp = os.path.getatime(path)
-        last_modify_str = time.strftime('%Y-%m-%d %H:%M:%S', last_modify_tsp)
+        local_time = time.localtime(last_modify_tsp)
+        last_modify_str = time.strftime('%Y-%m-%d %H:%M:%S', local_time)
         self.set_header('Last-Modified', last_modify_str)
 
         # 文件的MIME类型
@@ -156,7 +167,10 @@ class HttpResponsFile(HttpRespons):
         with open(path, 'r') as file:
             while True:
                 data = file.read(self.mtu)
-                if len(data) > 0:
+                length = len(data)
+                if length == self.mtu or length > 0:
+                    print("yield")
                     yield data
-                if len(data) < self.mtu:
+                else:
+                    print("done")
                     break
