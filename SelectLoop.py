@@ -107,6 +107,7 @@ class SelectLoop:
                     readable, writable, _ = select.select(r, w, [], ttw)
                 except Exception as e:
                     print(e)
+                    readable, writable = list(), list()
                 for fds in readable: self.read_probe[fds](fds)
                 for fds in writable: self.write_probe[fds](fds)
             else:
