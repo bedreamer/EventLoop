@@ -8,6 +8,7 @@ import os
 import types
 import mimetypes
 import urlparse
+from HttpRespons import *
 
 
 def log(*args):
@@ -53,41 +54,8 @@ class Httpd(SelectSocket.SelectSocketServer):
                 continue
             return route['protocol']
 
-        # not found
+        # not registed path found
         return HttpFileProtocol
-
-
-class HttpAck:
-    """Http应答对象"""
-    def __init__(self, request, code, status, iterable_body):
-        self.headers = dict()
-        self.request = request
-        self.code = code
-        self.status = status
-        self.iterable_body = iterable_body
-        self.ack_ready = False
-        self.add_header('Server', 'httpd by Lijie / V2.1')
-        self.sent_eoh = False
-
-    def add_header(self, key, value):
-        """添加一个头部"""
-        self.headers[key] = value
-
-    def start(self):
-        """可以启动应答了"""
-        self.ack_ready = True
-
-    def is_ready(self):
-        """判定应答是否准备好"""
-        return self.ack_ready
-
-    def do_ack(self):
-        """执行ACK应答，返回None表示应答完成"""
-        ex_headers = ["%s: %s\r\n" % (key, value) for key, value in self.headers.items()]
-        headers = ["%s %d %s\r\n" % (self.request.version, self.code, self.status)]
-        headers.extend(ex_headers)
-        headers.append('\r\n')
-        return "".join(headers), self.iterable_body
 
 
 class HttpBaseProtocol(object):
@@ -108,89 +76,48 @@ class HttpBaseProtocol(object):
         pass
 
     def do_get(self):
-        """处理GET方法，返回可迭代对象, 连接即随即关闭"""
+        """处理GET方法，返回非None对象, 连接随即关闭"""
         pass
 
     def do_post(self):
-        """处理POST方法，返回可迭代对象, 连接即随即关闭"""
+        """处理POST方法，返回非None对象, 连接随即关闭"""
         pass
 
     def do_request_data(self, data):
         """用于接收请求主体数据"""
         pass
 
-    def do_ack(self, code, status, iterable_body):
-        """执行应答"""
-        ack = HttpAck(self.request, code, status, iterable_body)
-        ack.start()
-        return ack
-
-    def ack_200(self, html=None):
-        """返回200"""
-        if html is None:
-            html = "Nothing to be returned"
-        return self.do_ack(200, 'OK', [html])
-
-    def ack_404(self, html=None):
-        """返回404错误"""
-        if html is None:
-            html = "Could not Found %s" % self.request.url
-        return self.do_ack(404, 'Not Found', [html])
-
-    def ack_503(self, html=None):
-        """返回503内部错误"""
-        if html is None:
-            html = "Server error"
-        return self.do_ack(503, 'Server Error', [html])
-
 
 class HttpFileProtocol(HttpBaseProtocol):
     def __init__(self, request):
         super(HttpFileProtocol, self).__init__(request)
-        self.path = None
-        self.root = '/home/kirk/www'
+        self.root = './'
 
-    def handle_file_path(self):
-        root, ext = os.path.splitext(self.path)
-        try:
-            mime = mimetypes.types_map[ext]
-        except:
-            mime = 'unknown'
-        header = [self.request.version + " 200 OK",
-                  "Content-Type: %s" % mime,
-                  "Content-Length: %d" % os.path.getsize(self.path), "\r\n"]
-        heades = "\r\n".join(header)
-        yield heades
-        with open(self.path, 'r') as file:
-            data = file.read(1024)
-            yield data
-            while len(data) > 0:
-                data = file.read(1024)
-                if len(data) > 0:
-                    yield data
-
-                if len(data) < 1024:
-                    break
-
-    def do_get(self):
+    def do_normal_response(self):
         url = urlparse.unquote(self.request.url)
         path = self.root + url
 
         if os.path.exists(path) is False:
-            return self.ack_404()
+            return HttpRespons(code=404)
 
+        full_path = path
         if os.path.isdir(path) is True:
-            if os.path.exists(path + 'index.html') is True:
-                self.path = path + 'index.html'
-                return self.handle_file_path()
-        elif os.path.isfile(path) is True:
-            self.path = path
-            return self.handle_file_path()
+            full_path = "".join([path, "index.html"])
 
-        return ''
+        if os.path.exists(full_path) is False:
+            return HttpRespons(code=404)
+        elif os.path.isfile(full_path) is False:
+            return HttpRespons(code=406)
+        elif os.access(full_path, os.R_OK) is False:
+            return HttpRespons(code=403)
+        else:
+            return HttpResponsFile(path=full_path)
+
+    def do_get(self):
+        return self.do_normal_response()
 
     def do_post(self):
-        pass
+        return self.do_normal_response()
 
 
 class Request:
@@ -219,7 +146,8 @@ class HttpRequestParser:
         requst = Request()
 
         # 把第一个字符串弹出来，后面可以使用循环
-        line = candy.pop(0).split(' ')
+        first_line = candy.pop(0)
+        line = urlparse.unquote(first_line).split(' ')
         setattr(requst, 'method', line[0].upper())
 
         uri = line[1]
@@ -256,9 +184,8 @@ class HttpConnection:
         self.request_data_size = 0
         # 已经接收到的请求体数据长度
         self.received_request_data_size = 0
-        # 应答数据体，可迭代对象
-        self.ack = None
-        self.iter = None
+        # 应答可迭代对象
+        self.response = None
 
     def find_url_binder(self):
         """搜索匹配的URL路由应答对象"""
@@ -300,12 +227,13 @@ class HttpConnection:
             if self.request is None:
                 return
 
+            # 无论何种情况都会找到一个对应的处理句柄
+            # 可能的句柄有:
+            #  1. 注册过的path
+            #  2. 文件系统中存在的可访问文件
+            #  3. 文件系统中存在的不可访问文件
+            #  4. 文件系统中不存在的文件
             binder = self.find_url_binder()
-            if binder is None:
-                _loop = get_select_loop()
-                _loop.schedule_write(self.fds, self.writable)
-                return
-
             self.binder = binder(self.request)
             self.binder.do_request()
 
@@ -331,85 +259,30 @@ class HttpConnection:
 
     def writable(self, fds):
         """连接可写"""
-        if self.binder is None:
-            try:
-                fds.send("HTTP/1.1 404 Not Found\r\n\r\n")
-            except:
-                pass
-            self.close()
-            return
-
-        if self.ack is None:
+        if self.response is None:
             if self.request.method.upper() == 'GET':
-                self.ack = self.binder.do_get()
+                self.response = self.binder.do_get()
             elif self.request.method.upper() == 'POST':
-                self.ack = self.binder.do_post()
+                self.response = self.binder.do_post()
             else:
-                try:
-                    fds.send("HTTP/1.1 501 Not Supported method\r\n\r\n")
-                except:
-                    self.binder.connection_lost()
-                self.close()
-                return
+                self.response = HttpRespons(code=405)
 
-        if self.ack is None:
-            return None
-
-        if isinstance(self.ack, str):
-            try:
-                fds.send(self.ack)
-            except:
-                self.binder.connection_lost()
-            self.close()
-            return
-        elif isinstance(self.ack, list):
-            try:
-                fds.send("".join(self.ack))
-            except:
-                self.binder.connection_lost()
-                self.close()
-        elif isinstance(self.ack, types.GeneratorType):
-            max_loops = 128
-            while max_loops > 0:
-                max_loops -= 1
-                try:
-                    data = self.ack.next()
-                except StopIteration:
-                    self.close()
-                    break
-                except:
-                    self.close()
-                    break
-
-                try:
-                    fds.send(data)
-                except:
-                    self.binder.connection_lost()
-                    self.close()
-                    break
-        else:
-            try:
-                fds.send("HTTP/1.1 501 Inner Error\r\n\r\n")
-            except:
-                self.binder.connection_lost()
-            self.close()
+        # 应答体是空的，继续轮询，这种情况多应用于长连接过程
+        if self.response is None:
             return
 
-    def start_receive(self):
-        """在当前连接上开始接收数据"""
-        pass
-
-    def stop_receive(self):
-        """停止当前连接的数据接收"""
-        pass
-
-    def start_transmit(self):
-        """开始当前连接上的数据传输"""
-        pass
-
-    def stop_transmit(self):
-        """停止当前接连的数据传输"""
-        pass
+        # 需要对每个连接占用CPU的时间做限制，避免其他循环事件被`饿死`
+        max_sent_time_in_sec = 20.0 / 1000
+        begin = time.time()
+        times = 0
+        while time.time() - begin < max_sent_time_in_sec:
+            try:
+                response_data = self.response.next()
+                fds.send(response_data)
+                times += 1
+            except Exception as e:
+                self.close()
+                break
 
 
 if __name__ == '__main__':
