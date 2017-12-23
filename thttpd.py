@@ -274,7 +274,7 @@ class HttpConnection:
                 response = HttpRespons(code=405)
 
             # 无论应答端返回哪种非应答对象的数据全都统一转换,保证接口统一
-            if issubclass(response, HttpRespons) is True:
+            if issubclass(type(response), HttpRespons) is True:
                 self.response = response
             else:
                 self.response = HttpRespons()
