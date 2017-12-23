@@ -41,10 +41,10 @@ class Httpd(SelectSocket.SelectSocketServer):
         """注册回调函数"""
         r = re.compile(r_path)
         d = {
-            'r_path': r_path,
+            'r_path': r,
             'protocol': process_protocol
         }
-        self.path_route[r_path] = r
+        self.path_route[r_path] = d
 
     def route_match(self, method, url, query_string):
         """从路由表中匹配一个应答器"""
@@ -72,7 +72,10 @@ class HttpBaseProtocol(object):
         pass
 
     def do_request(self):
-        """头部接收完成后调用该接口"""
+        """ 头部接收完成后调用该接口
+            例如，GET/POST头部接收完成后，通过头部判定权限、SessionID、Cookie、上传路径合法性等，
+            若需要关闭连接，则返回标准应答对象HttpResonse
+        """
         pass
 
     def do_get(self):
@@ -236,9 +239,14 @@ class HttpConnection:
             binder = self.find_url_binder()
             try:
                 self.binder = binder(self.request)
-                self.binder.do_request()
+                response = self.binder.do_request()
+                if issubclass(type(response), HttpRespons) is True:
+                    self.response = response
             except:
                 self.response = HttpRespons(code=500)
+
+            # 再do_request时发生了可返回的情况，则直接返回，不在接收剩余数据
+            if self.response is not None:
                 _loop = get_select_loop()
                 _loop.schedule_write(self.fds, self.writable)
                 return
@@ -252,7 +260,7 @@ class HttpConnection:
             # 将请求过程中间数据放到请求体数据中
             if remain_body not in {None, ''}:
                 self.received_request_data_size += len(remain_body)
-                self.binder.do_request_data(data)
+                self.binder.do_request_data(remain_body)
         else:
             self.received_request_data_size += len(data)
             self.binder.do_request_data(data)
@@ -297,8 +305,25 @@ class HttpConnection:
                 break
 
 
+class UpLoadeServer(HttpBaseProtocol):
+    def __init__(self, request):
+        super(UpLoadeServer, self).__init__(request)
+
+    def do_request(self):
+        #return HttpRespons(code=404)
+        return HttpResponsRedirect('/thttpd.py')
+        pass
+
+    def do_request_data(self, data):
+        print(len(data), data.encode('utf8')[:8], '...')
+
+    def do_post(self):
+        print("do post")
+
+
 if __name__ == '__main__':
     loop = get_select_loop()
     httpd = Httpd(iface='0.0.0.0', port=8080)
     httpd.start()
+    httpd.route('/upload', UpLoadeServer)
     loop.run_forever()
