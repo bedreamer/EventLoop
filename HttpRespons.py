@@ -164,13 +164,14 @@ class HttpResponsFile(HttpRespons):
     def normal_file_wrapper(self, path):
         """将普通的文件作为生成器返回"""
         yield self.make_respons_header()
-        with open(path, 'r') as file:
+        with open(path, 'rb') as file:
+            deep = 0
             while True:
                 data = file.read(self.mtu)
                 length = len(data)
                 if length == self.mtu or length > 0:
-                    print("yield")
+                    deep += 1
                     yield data
                 else:
-                    print("done")
                     break
+        return
