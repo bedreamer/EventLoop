@@ -135,6 +135,16 @@ class HttpRespons(object):
             raise NotImplemented
 
 
+class HttpResponsRedirect(HttpRespons):
+    """HTTP结果重定向"""
+    def __init__(self, target_location, headers=None, code=None):
+        if code not in {301, 308, 302, 303, 307, 300, 304}:
+            # 返回临时重定向
+            code = 307
+        super(HttpResponsRedirect, self).__init__(body=None, headers=headers, code=code)
+        self.set_header('Location', target_location)
+
+
 class HttpResponsFile(HttpRespons):
     """应答一个普通文件"""
     def __init__(self, path, headers=None, code=None):
