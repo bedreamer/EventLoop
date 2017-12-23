@@ -234,8 +234,14 @@ class HttpConnection:
             #  3. 文件系统中存在的不可访问文件
             #  4. 文件系统中不存在的文件
             binder = self.find_url_binder()
-            self.binder = binder(self.request)
-            self.binder.do_request()
+            try:
+                self.binder = binder(self.request)
+                self.binder.do_request()
+            except:
+                self.response = HttpRespons(code=500)
+                _loop = get_select_loop()
+                _loop.schedule_write(self.fds, self.writable)
+                return
 
             try:
                 self.request_data_size = int(self.request.content_length)
@@ -261,11 +267,17 @@ class HttpConnection:
         """连接可写"""
         if self.response is None:
             if self.request.method.upper() == 'GET':
-                self.response = self.binder.do_get()
+                response = self.binder.do_get()
             elif self.request.method.upper() == 'POST':
-                self.response = self.binder.do_post()
+                response = self.binder.do_post()
             else:
-                self.response = HttpRespons(code=405)
+                response = HttpRespons(code=405)
+
+            # 无论应答端返回哪种非应答对象的数据全都统一转换,保证接口统一
+            if issubclass(response, HttpRespons) is True:
+                self.response = response
+            else:
+                self.response = HttpRespons()
 
         # 应答体是空的，继续轮询，这种情况多应用于长连接过程
         if self.response is None:
