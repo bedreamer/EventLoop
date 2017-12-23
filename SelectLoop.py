@@ -108,8 +108,17 @@ class SelectLoop:
                 except Exception as e:
                     print(e)
                     readable, writable = list(), list()
-                for fds in readable: self.read_probe[fds](fds)
-                for fds in writable: self.write_probe[fds](fds)
+
+                for fds in readable:
+                    try:
+                        self.read_probe[fds](fds)
+                    except:
+                        pass
+                for fds in writable:
+                    try:
+                        self.write_probe[fds](fds)
+                    except:
+                        pass
             else:
                 time.sleep(almost_die_delta)
 
