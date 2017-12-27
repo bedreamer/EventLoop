@@ -112,12 +112,12 @@ class SelectLoop:
                 for fds in readable:
                     try:
                         self.read_probe[fds](fds)
-                    except:
+                    except Exception as e:
                         pass
                 for fds in writable:
                     try:
                         self.write_probe[fds](fds)
-                    except:
+                    except Exception as e:
                         pass
             else:
                 time.sleep(almost_die_delta)

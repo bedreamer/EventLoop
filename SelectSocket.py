@@ -67,7 +67,7 @@ class SelectSocketServer(object):
         raise TypeError("you should override this function.")
 
 
-class SelectSocketClient:
+class SelectSocketClient(object):
     def __init__(self, remote_host, remote_port):
         self.remote_host = remote_host
         self.remote_port = remote_port
@@ -116,18 +116,37 @@ class SelectSocketClient:
         loop.schedule_read(self.fds, self._connect_readable)
         loop.schedule_write(self.fds, self._connect_writable)
 
+    def readable(self, fds):
+        """连接可读"""
+        self.close_connection_safely()
+
+    def writable(self, fds):
+        """连接可写"""
+        self.close_connection_safely()
+
+    def connect_success(self):
+        """连接成功"""
+        loop = get_select_loop()
+        loop.schedule_read(self.fds, self.readable)
+        loop.schedule_write(self.fds, self.writable)
+
+    def connect_fail(self):
+        """连接失败"""
+        self.close_connection_safely()
+
     def _connect_readable(self, fds):
         """异步连接过程中，描述符可读"""
         print("connection failed!")
-        self.disconnect()
+        self.close_connection_safely()
 
     def _connect_writable(self, fds):
         """异步连接过程中，描述符可写"""
         print("connection ok!")
-        self.fds.setblocking(True)
-        self.disconnect()
+        self.fds.setblocking(1)
+        self.fds.settimeout(75)
+        self.connect_success()
 
-    def disconnect(self):
+    def close_connection_safely(self):
         """断开连接"""
         if self.fds is None:
             return
