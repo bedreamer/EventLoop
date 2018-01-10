@@ -36,6 +36,7 @@ class WebSocketRespons(HttpRespons.HttpRespons):
     def calc_secure_key(self, request_key):
         try:
             magic = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+            # 需要对请求KEY进行strip操作，否则可能会导致空格也被纳入sha1计算
             sha1 = hashlib.sha1(request_key.strip() + magic)
             key = base64.b64encode(sha1.digest())
             return key
@@ -61,7 +62,7 @@ class WebSocketRespons(HttpRespons.HttpRespons):
         while time.time() - now < 3:
             data = self.send_data('Hello World!\r\n')
             yield data
-        print 'done'
+        print('done')
 
 
 class WebSocketEntry(thttpd.HttpBaseProtocol):
@@ -76,4 +77,4 @@ class WebSocketEntry(thttpd.HttpBaseProtocol):
         return WebSocketRespons(self.request)
 
     def do_request_data(self, data):
-        print data
+        print(data)

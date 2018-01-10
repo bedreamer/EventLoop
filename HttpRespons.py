@@ -59,11 +59,8 @@ class HttpRespons(object):
         if headers is None:
             headers = dict()
 
-        self.code = code
-        try:
-            self.status = status_string[code]
-        except:
-            self.status = 'Invalid'
+        self.code = 500
+        self.set_status(code)
 
         default_headers = dict()
         default_headers['Content-Type'] = 'text/html'
@@ -76,6 +73,13 @@ class HttpRespons(object):
         # 无论该应答体提供何种数据，都统一转换成生成器的形式
         self.iterable_body = None
         self.set_response(body)
+
+    def set_status(self, code):
+        try:
+            self.code = code
+            self.status = status_string[code]
+        except:
+            self.status = 'Invalid'
 
     def next(self):
         """用于进行数据迭代输出"""
@@ -94,7 +98,10 @@ class HttpRespons(object):
 
     def make_respons_header(self):
         """将全部头部连同EOH一起返回"""
-        ex_headers = ["%s: %s\r\n" % (key, value) for key, value in self.headers.items()]
+        ex_headers = list()
+        for key, value in self.headers.items():
+            ex_headers.append("%s: %s\r\n" % (key, value))
+        #ex_headers = ["%s: %s\r\n" % (key, value) for key, value in self.headers.items()]
         headers = ["%s %d %s\r\n" % ('HTTP/1.1', self.code, self.status)]
         headers.extend(ex_headers)
         headers.append('\r\n')

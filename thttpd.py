@@ -12,9 +12,8 @@ from HttpRespons import *
 
 
 def log(*args):
-    #tsp = time.strftime("[%Y-%m-%d %H:%M:%S]")
-    #print(tsp, *args)
-    pass
+    tsp = time.strftime("[%Y-%m-%d %H:%M:%S]")
+    print(tsp, *args)
 
 
 class Httpd(SelectSocket.SelectSocketServer):
@@ -95,7 +94,7 @@ class HttpBaseProtocol(object):
 class HttpFileProtocol(HttpBaseProtocol):
     def __init__(self, request):
         super(HttpFileProtocol, self).__init__(request)
-        self.root = '/home/kirk/www/'
+        self.root = './www/'
 
     def do_normal_response(self):
         url = urlparse.unquote(self.request.url)
@@ -269,8 +268,8 @@ class HttpConnection:
         # 请求数据接收完成，下一步转为应答状态，
         # 但此时并不关闭该连接的读数据状态，用于监测连接断开事件
         if self.received_request_data_size >= self.request_data_size:
-            _loop = get_select_loop()
-            _loop.schedule_write(self.fds, self.writable)
+            t_loop = get_select_loop()
+            t_loop.schedule_write(self.fds, self.writable)
 
     def writable(self, fds):
         """连接可写"""
@@ -280,73 +279,61 @@ class HttpConnection:
             elif self.request.method.upper() == 'POST':
                 response = self.binder.do_post()
             else:
-                # 暂时不支持除GET和POST以外的其他方法
                 response = HttpRespons(code=405)
 
-            # 无论应答端返回哪种非应答对象的数据全都统一转换, 保证接口统一
+            # 无论应答端返回哪种非应答对象的数据全都统一转换,保证接口统一
             if issubclass(type(response), HttpRespons) is True:
                 self.response = response
             else:
-                # 返回对象后默认是成功的
-                self.response = HttpRespons(response)
+                self.response = HttpRespons()
 
         # 应答体是空的，继续轮询，这种情况多应用于长连接过程
         if self.response is None:
             return
 
         # 需要对每个连接占用CPU的时间做限制，避免其他循环事件被`饿死`
-        max_sent_time_in_sec = 10.0 / 1000
+        max_sent_time_in_sec = 20.0 / 1000
         begin = time.time()
         times = 0
         while time.time() - begin < max_sent_time_in_sec:
             try:
                 response_data = self.response.next()
+
+                # 返回None表示维持长连接
+                if response_data is None:
+                    break
+
                 fds.send(response_data)
                 times += 1
             except Exception as e:
                 self.close()
                 break
 
-
-class UpLoadeServer(HttpBaseProtocol):
     def do_request(self):
         #return HttpRespons(code=404)
+        #return HttpResponsRedirect('/thttpd.py?id=111')
         pass
 
     def do_request_data(self, data):
-        print(len(data), data.encode('hex')[:8], '...')
+        log(data)
+        #print(len(data), data.encode('utf8')[:8], '...')
 
     def do_post(self):
         print("do post")
-        return HttpResponsFile('./thttpd.py')
 
 
-class TestPlain(HttpBaseProtocol):
-    def do_post(self):
-        return '999999999999'
-
-    def do_get(self):
-        return '999999999999'
-
-
-class JsonTester(HttpBaseProtocol):
-    def do_post(self):
-        return {'status': 'ok', "x":[11, 2, 3, 4, 5]}
-
-    def do_get(self):
-        return {'status': 'ok', "x":[11, 2, 3, 4, 5]}
-
-
-class FlvTester(HttpBaseProtocol):
-    def do_get(self):
-        return
+# HTTP上传入口
+class UpLoadeEntry(HttpBaseProtocol):
+    def __init__(self, request):
+        super(UpLoadeEntry, self).__init__(request)
 
 
 if __name__ == '__main__':
+    import websocket
     loop = get_select_loop()
     httpd = Httpd(iface='0.0.0.0', port=8080)
     httpd.start()
-    httpd.route('/upload', UpLoadeServer)
-    httpd.route('/plain', TestPlain)
-    httpd.route('/json', JsonTester)
+    #httpd.route('/upload', UpLoadeEntry)
+    httpd.route('/websocket/entry/', websocket.WebSocketEntry)
+    #httpd.route('/upload', UpLoadeEntry)
     loop.run_forever()
