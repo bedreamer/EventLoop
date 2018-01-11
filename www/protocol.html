@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>上传协议</title>
+</head>
+<body>
+<pre>数据流传输方式： 二进制
+字节排列顺序: 大端模式
+数据帧传送格式：
++---------+
++ BOP     + 4 bytes
++---------+
++ LEN     + 2 bytes
++---------+
++ TSP     + 4 bytes
++---------+
++ PID     + 1 byte
++---------+
++ PAYLOAD + LEN bytes
++---------+
++ SUM     + 1 byte
++---------+
++ EOP     + 4 bytes
++---------+
+包内容解释:
+BOP: 包起始标识， 用4个0x55填充
+LEN: PAYLOAD 长度
+TSP: 数据采集时戳， 单位是ms
+PID: 这个包的数据类型
+PID == 0: 无效包
+PID == 1: 摄像头采样数据, PAYLOAD格式参考PAYLOAD_CAMERA_SAMPLE
+PID == other: 暂时保留
+SUM: LEN,TSP,PID,PAYLOAD按字节异或值
+EOP: 包结束标识， 用4个0xAA填充
+有效载荷解释：
+PAYLOAD_CAMERA_SAMPLE: 摄像头采样数据格式
++-----------------+
++ DATA_TYPE       + 1 byte
++-----------------+
++ ROW_BEGIN       + 2 bytes
++-----------------+
++ ROW_END         + 2 bytes
++-----------------+
++ COL_IN_PIXEL    + 2 bytes
++-----------------+
++ PIXEL_DATA      + n bytes
++-----------------+
+DATA_TYPE: 传输的数据体PIXEL_DATA格式
+DATA_TYPE == 0: 无效
+DATA_TYPE == 1: 二值化数据， 一个像素点占1个位
+DATA_TYPE == 2: 灰度图， 一个像素点占1个字节
+DATA_TYPE == other: 暂时保留
+ROW_BEGIN: 这个数据体中传输的开始行号， 起始行号使用 0
+ROW_END: 这个数据体中传输的结束行号
+COL_IN_PIXEL: 传输的图片有多少列
+PIXEL_DATA: 二进制数据体， 一列数据无法填充满一个字节的需要使用一个字节表示， 未使用的位用1填充
+</pre>
+</body>
+</html>

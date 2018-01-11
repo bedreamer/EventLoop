@@ -281,15 +281,15 @@ class HttpConnection:
             else:
                 response = HttpRespons(code=405)
 
+            # 应答体是空的，继续轮询，这种情况多应用于长连接过程
+            if response is None:
+                return
+
             # 无论应答端返回哪种非应答对象的数据全都统一转换,保证接口统一
             if issubclass(type(response), HttpRespons) is True:
                 self.response = response
             else:
-                self.response = HttpRespons()
-
-        # 应答体是空的，继续轮询，这种情况多应用于长连接过程
-        if self.response is None:
-            return
+                self.response = HttpRespons(response)
 
         # 需要对每个连接占用CPU的时间做限制，避免其他循环事件被`饿死`
         max_sent_time_in_sec = 20.0 / 1000
@@ -328,11 +328,22 @@ class UpLoadeEntry(HttpBaseProtocol):
         super(UpLoadeEntry, self).__init__(request)
 
 
+# 获取实时数据
+class LiveData(HttpBaseProtocol):
+    def __init__(self, request):
+        super(LiveData, self).__init__(request)
+
+    def do_get(self):
+        pass
+
+
+
 if __name__ == '__main__':
     import websocket
     loop = get_select_loop()
     httpd = Httpd(iface='0.0.0.0', port=8080)
     httpd.start()
+    httpd.route("/live/", LiveData)
     #httpd.route('/upload', UpLoadeEntry)
     httpd.route('/websocket/entry/', websocket.WebSocketEntry)
     #httpd.route('/upload', UpLoadeEntry)
