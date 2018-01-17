@@ -383,3 +383,15 @@ $( "#slider" ).slider(
 );
 $("#slider").css("width", "450px");
 $('#id_thrhold').html(ctx.threshold);
+
+var wifi_address = $.cookie('wifi');
+if ( wifi_address != undefined ) {
+    $('#id_addr').val(wifi_address);
+}
+
+$('#link').click(function(){
+    var wifi = $('#id_addr').val();
+    if ( wifi != undefined && wifi != null && wifi != '' ) {
+        $.cookie('wifi', wifi, { expires: 60});
+    }
+});

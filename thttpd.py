@@ -328,14 +328,42 @@ class UpLoadeEntry(HttpBaseProtocol):
         super(UpLoadeEntry, self).__init__(request)
 
 
+# 连接会话
+session = dict()
+
+
+import uuid
+from SelectSocket import *
+# 连接模块
+class LinkModule(HttpBaseProtocol):
+    def __init__(self, request):
+        super(LinkModule, self).__init__(request)
+
+    def do_get(self):
+        id = uuid.uuid4().hex
+        ip = '127.0.0.1'
+        port = 8000
+
+        conn = SelectSocketClient(ip, port)
+        return {'status': 'ok', 'key': id}
+
+
+# 关闭连接
+class DisconnectModule(HttpBaseProtocol):
+    def __init__(self, request):
+        super(DisconnectModule, self).__init__(request)
+
+    def do_get(self):
+        return {'status': 'fail', 'reason': 'unknown'}
+
+
 # 获取实时数据
 class LiveData(HttpBaseProtocol):
     def __init__(self, request):
         super(LiveData, self).__init__(request)
 
     def do_get(self):
-        pass
-
+        return {'status': 'fail', 'reason': 'unknown'}
 
 
 if __name__ == '__main__':
@@ -343,8 +371,7 @@ if __name__ == '__main__':
     loop = get_select_loop()
     httpd = Httpd(iface='0.0.0.0', port=8080)
     httpd.start()
-    httpd.route("/live/", LiveData)
-    #httpd.route('/upload', UpLoadeEntry)
-    httpd.route('/websocket/entry/', websocket.WebSocketEntry)
-    #httpd.route('/upload', UpLoadeEntry)
+    httpd.route("/connect.json", LinkModule)
+    httpd.route("/drop.json", DisconnectModule)
+    httpd.route("/live.json", LiveData)
     loop.run_forever()

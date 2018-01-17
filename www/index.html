@@ -7,6 +7,7 @@
 <script src="js/bootstrap.min.js"></script>
 <script src="js/bootstrap-slider.js"></script>
 <script src="js/jquery-ui.min.js"></script>
+<script src="js/jquery.cookie.js"></script>
 <meta charset="utf-8">
     <style>
         .control-panel {
@@ -28,6 +29,13 @@
 <div class="container-fluid">
     <center>
         <br>
+        <div>
+            <div>
+                WIFI模块IP地址及端口：
+                <input id="id_addr" placeholder="101.68.22.23:99"></input>
+                <button class="btn btn-success" id="link">连接</button>
+            </div>
+        </div><br>
         <div class="row">
             <button class="btn btn-default" id="live">实时</button>
             <button class="btn btn-default" id="start">开始</button>
