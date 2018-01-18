@@ -389,9 +389,86 @@ if ( wifi_address != undefined ) {
     $('#id_addr').val(wifi_address);
 }
 
+
+var handle = undefined;
+function pool_data() {
+    var wifi = $('#id_addr').val();
+    $.getJSON('http://127.0.0.1:8080/live.json?key=' + wifi + '&t=' + Date.parse(new Date()), '', function(data, status, xhr) {
+        if ( data.status == 'ok' ) {
+            pool_start(10);
+        } else {
+            disconnect(wifi);
+            $('#id_msg').html(data.status);
+        }
+    }).fail(function(){
+        disconnect(wifi);
+        $('#id_msg').html('数据连接异常中止！');
+    });
+}
+
+function pool_start(t) {
+    if ( handle != undefined ) {
+        clearTimeout(handle);
+    }
+
+    handle = setTimeout(pool_data(), t);
+}
+
+function pool_stop() {
+    if ( handle != undefined ) {
+        clearTimeout(handle);
+    }
+}
+
+function connection(wifi) {
+    $('#link').attr('disable', 'true');
+    $.getJSON('http://127.0.0.1:8080/connect.json?addr=' + wifi + '&t=' + Date.parse(new Date()), '', function(data, status, xhr) {
+        if ( data.status == 'ok') {
+            $('#link').html('断开');
+            $('#link').removeClass('btn-success');
+            $('#link').addClass('btn-danger');
+            $('#id_msg').html('&nbsp;');
+            pool_start(100);
+        } else {
+            $('#id_msg').html(data.reason);
+        }
+        $('#link').attr('disable', 'false');
+    }).fail(function(){
+        $('#id_msg').html('无法连接！');
+        $('#link').attr('disable', 'false');
+    });
+}
+
+function disconnect(wifi) {
+    $('#link').attr('disable', 'true');
+    $.getJSON('http://127.0.0.1:8080/drop.json?key=' + wifi + '&t=' + Date.parse(new Date()), '', function(data, status, xhr) {
+        if ( data.status == 'ok') {
+            $('#id_msg').html('&nbsp;');
+            $('#link').html('连接');
+            $('#link').removeClass('btn-danger');
+            $('#link').addClass('btn-success');
+        } else {
+            $('#id_msg').html(data.reason);
+        }
+        $('#link').attr('disable', 'false');
+    }).fail(function(){
+        $('#id_msg').html('无法连接！');
+        $('#link').attr('disable', 'false');
+    });
+}
+
 $('#link').click(function(){
     var wifi = $('#id_addr').val();
     if ( wifi != undefined && wifi != null && wifi != '' ) {
         $.cookie('wifi', wifi, { expires: 60});
     }
+    var title = $('#link').html();
+    if ( title == '连接') {
+        $('#id_msg').html('&nbsp;');
+        connection(wifi);
+    } else {
+        $('#id_msg').html('&nbsp;');
+        disconnect(wifi);
+    }
+
 });

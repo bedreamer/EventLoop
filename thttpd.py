@@ -132,6 +132,22 @@ class HttpRequestParser:
     def __init__(self):
         self.cache = list()
 
+    @classmethod
+    def parser_query(self, q):
+        r = Request()
+        if '&' in q:
+            q = q.split('&')
+        else:
+            q = [q]
+
+        for item in q:
+            x = item.split('=')
+            if len(x) == 1:
+                x.append('')
+            setattr(r, x[0], x[1])
+
+        return r
+
     def push(self, data):
         """压入要解析的数据"""
         self.cache.append(data)
@@ -159,8 +175,10 @@ class HttpRequestParser:
         setattr(requst, 'url', uri[0])
         if len(uri) == 1:
             setattr(requst, 'query_string', '')
+            setattr(requst, 'query', dict())
         else:
             setattr(requst, 'query_string', uri[1])
+            setattr(requst, 'query', self.parser_query(uri[1]))
 
         setattr(requst, 'version', line[2].upper())
         for line in candy:
@@ -329,23 +347,86 @@ class UpLoadeEntry(HttpBaseProtocol):
 
 
 # 连接会话
-session = dict()
+_g_session = dict()
 
 
 import uuid
 from SelectSocket import *
+
+
+class Connection(SelectSocketClient):
+    def __init__(self, target, remote_host, remote_port):
+        super(Connection, self).__init__(remote_host, remote_port)
+        self.p = list()
+        self.target = target
+
+    def get(self):
+        if len(self.p) == 0:
+            return ''
+
+        x = ''.join(self.p)
+        self.p = list()
+        return x
+
+    def readable(self, fds):
+        try:
+            data = self.fds.recv(2048)
+            if len(data) == 0:
+                raise ValueError('connect closed!')
+        except:
+            global _g_session
+            del _g_session[self.target]
+            self.close_connection_safely()
+            return
+
+        import datetime
+        tsp = datetime.datetime.now().strftime('[%b-%d-%y %H:%M:%S] ')
+        with open('data.txt', 'a') as file:
+            file.write(tsp)
+            file.write(data.encode('hex'))
+            file.write('\n')
+
+        self.p.append(data)
+
+    def writable(self, fds):
+        pass
+
+
 # 连接模块
 class LinkModule(HttpBaseProtocol):
     def __init__(self, request):
         super(LinkModule, self).__init__(request)
 
     def do_get(self):
+        global _g_session
         id = uuid.uuid4().hex
-        ip = '127.0.0.1'
-        port = 8000
+        try:
+            addr = self.request.query.addr
+        except:
+            return {'status': 'fail', 'reason': "需要提供有效的IP地址！"}
 
-        conn = SelectSocketClient(ip, port)
-        return {'status': 'ok', 'key': id}
+        target = addr
+        addr = addr.split(':')
+        try:
+            ip, port = addr[0], int(addr[1])
+        except:
+            return {'status': 'fail', 'reason': "IP地址无效！"}
+
+        session = None
+        if target not in _g_session:
+            session = Connection(target, ip, port)
+            _g_session[ target ] = session
+        else:
+            session = _g_session[target]
+
+        if session.is_closed() is True:
+            del _g_session[target]
+            return {'status': 'fail', 'reason': "连接已关闭"}
+
+        if session.is_connected() is True:
+            return {'status': 'ok', 'key': target}
+
+        return None
 
 
 # 关闭连接
@@ -354,7 +435,16 @@ class DisconnectModule(HttpBaseProtocol):
         super(DisconnectModule, self).__init__(request)
 
     def do_get(self):
-        return {'status': 'fail', 'reason': 'unknown'}
+        global _g_session
+        try:
+            target = self.request.query.key
+            session = _g_session[target]
+        except:
+            return {'status': 'fail', 'reason': 'not connect'}
+
+        session.close_connection_safely()
+        del _g_session[target]
+        return {'status': 'ok'}
 
 
 # 获取实时数据
@@ -363,7 +453,21 @@ class LiveData(HttpBaseProtocol):
         super(LiveData, self).__init__(request)
 
     def do_get(self):
-        return {'status': 'fail', 'reason': 'unknown'}
+        global _g_session
+        try:
+            target = self.request.query.key
+            session = _g_session[target]
+        except:
+            return {'status': 'fail', 'reason': 'not connect'}
+
+        data = session.get()
+        if data is None:
+            return {'status': 'fail', 'reason': 'connection closed'}
+
+        if data == '':
+            return None
+
+        return {'status': 'ok', 'data': data}
 
 
 if __name__ == '__main__':

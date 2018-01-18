@@ -78,6 +78,12 @@ class SelectSocketClient(object):
         if None not in {remote_host, remote_port}:
             self.connect()
 
+    def is_closed(self):
+        return False if self.fds is not None else True
+
+    def is_connected(self):
+        return self.connect_ok
+
     def __del__(self):
         if self.fds is None:
             return
@@ -126,6 +132,7 @@ class SelectSocketClient(object):
 
     def connect_success(self):
         """连接成功"""
+        self.connect_ok = True
         loop = get_select_loop()
         loop.schedule_read(self.fds, self.readable)
         loop.schedule_write(self.fds, self.writable)
