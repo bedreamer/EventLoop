@@ -447,10 +447,28 @@ class DisconnectModule(HttpBaseProtocol):
         return {'status': 'ok'}
 
 
+import numpy as np
 # 获取实时数据
 class LiveData(HttpBaseProtocol):
     def __init__(self, request):
         super(LiveData, self).__init__(request)
+        x = [ord(c) for c in '00 01 02 03 04 05 06 07 08 09 0F FF'.replace(' ', '').decode('hex')]
+        arr = np.array(x, np.uint8)
+        bits = list(np.unpackbits(arr))
+        self.frame = {
+            'lines_pixels': [
+                {
+                    'pixels': bits,
+                    'datetime': '1970-01-01 00:00:00',
+                    'tsp': 0
+                }
+            ] * 60,
+            'edge_pixels': [
+                [0] * 120
+            ] * 60,
+            'datetime': '1970-01-01 00:00:00',
+            'tsp': 0
+        }
 
     def do_get(self):
         global _g_session
@@ -467,7 +485,7 @@ class LiveData(HttpBaseProtocol):
         if data == '':
             return None
 
-        return {'status': 'ok', 'data': data}
+        return {'status': 'ok', 'frame': self.frame}
 
 
 if __name__ == '__main__':

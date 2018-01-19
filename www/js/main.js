@@ -395,6 +395,8 @@ function pool_data() {
     var wifi = $('#id_addr').val();
     $.getJSON('http://127.0.0.1:8080/live.json?key=' + wifi + '&t=' + Date.parse(new Date()), '', function(data, status, xhr) {
         if ( data.status == 'ok' ) {
+            display_set_frame(ctx, data.frame);
+            display_update(ctx);
             pool_start(10);
         } else {
             disconnect(wifi);
